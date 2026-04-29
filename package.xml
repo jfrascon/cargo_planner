@@ -1,0 +1,42 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>cargo_planner</name>
+  <version>0.1.0</version>
+  <description>
+    2D cargo placement planner for truck trailer loading.
+    Given a nav_msgs/OccupancyGrid of the truck interior (produced by
+    truck_inspector) and a list of cargo units, computes an optimal placement
+    plan using morphological erosion (OpenCV) as the collision layer and a
+    greedy wall-hugging heuristic as the selection layer.
+  </description>
+  <maintainer email="user@example.com">cargo_planner</maintainer>
+  <license>MIT</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <buildtool_depend>ament_cmake_python</buildtool_depend>
+
+  <depend>rclcpp</depend>
+  <depend>rclcpp_action</depend>
+  <depend>nav_msgs</depend>
+  <depend>geometry_msgs</depend>
+  <depend>visualization_msgs</depend>
+  <depend>cargo_planner_msgs</depend>
+
+  <!-- OpenCV is found via CMake find_package(OpenCV); the rosdep key for the
+       system package is libopencv-dev. -->
+  <depend>libopencv-dev</depend>
+
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>ament_index_python</exec_depend>
+  <exec_depend>ros2_launch_helpers</exec_depend>
+
+  <test_depend>ament_cmake_gtest</test_depend>
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

@@ -1,0 +1,20 @@
+# All parameters can be overridden in CLI:
+#   ros2 launch cargo_planner cargo_planner.launch.py params_file:=/path/to/custom.yaml pallet_margin:=0.1 enable_rotation:=false ...
+
+/**/cargo_planner:
+  ros__parameters:
+
+    # Grid cells with value >= this are treated as occupied.
+    # Free cells = 0, occupied cells = 100.
+    occupied_threshold: 65
+
+    # Safety clearance [m] added around every obstacle before pallet placement.
+    # Implemented as a pre-erosion of the free-space image with a square kernel
+    # of size 2*ceil(pallet_margin/resolution)+1.
+    # Set to 0.0 to disable.
+    pallet_margin: 0.05
+
+    # If true, each cargo unit is tested in its natural orientation and at
+    # 90 degrees yaw.
+    # If false, only the natural orientation (0 degrees) is considered.
+    enable_rotation: true
