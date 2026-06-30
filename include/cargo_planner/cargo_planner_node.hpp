@@ -52,7 +52,7 @@
  *     The truck's free-space grid after all cargo units have been placed.
  *     Useful for debugging and for chaining with other planners.
  *
- * Parameters (see config/example_cargo_planner.yaml)
+ * Parameters (see config/default_cargo_planner.yaml)
  * ------------------------------------------
  *   truck_frame          TF frame of the truck interior.
  *   occupied_threshold   Cells >= this value are treated as occupied [0..100].
