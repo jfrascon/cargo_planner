@@ -1,0 +1,44 @@
+# Pallet list for the cargo_planner visualizer.
+#
+# This file uses the same structure as the cargo_planner_msgs/CargoListRegistration
+# service request: a top-level `cargo_units:` array with one mapping per pallet.
+#
+# Example scenario:
+#   - 8 EUR pallets
+#   - pallet footprint: 1.20 x 0.80 m
+#   - pallet height: 2.38 m
+#   - same height as a 40 ft container interior
+
+cargo_units:
+  - id: pallet_01
+    lx: 1.20
+    ly: 0.80
+    lz: 2.38
+  - id: pallet_02
+    lx: 1.20
+    ly: 0.80
+    lz: 2.38
+  - id: pallet_03
+    lx: 1.20
+    ly: 0.80
+    lz: 2.38
+  - id: pallet_04
+    lx: 1.20
+    ly: 0.80
+    lz: 2.38
+  - id: pallet_05
+    lx: 1.20
+    ly: 0.80
+    lz: 2.38
+  - id: pallet_06
+    lx: 1.20
+    ly: 0.80
+    lz: 2.38
+  - id: pallet_07
+    lx: 1.20
+    ly: 0.80
+    lz: 2.38
+  - id: pallet_08
+    lx: 1.20
+    ly: 0.80
+    lz: 2.38

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Launches the cargo_planner node, loading parameters from
-config/example_cargo_planner.yaml (installed with the package).
+config/default_cargo_planner.yaml (installed with the package).
 That file is used by default. Pass params_file:=/path/to/your.yaml to use a
 different file, and override individual parameters via CLI launch arguments.
 
@@ -34,7 +34,7 @@ def generate_launch_description():
             DeclareLaunchArgument(
                 'params_file',
                 default_value=os.path.join(
-                    get_package_share_directory('cargo_planner'), 'config', 'example_cargo_planner.yaml'
+                    get_package_share_directory('cargo_planner'), 'config', 'default_cargo_planner.yaml'
                 ),
                 description='YAML file with node parameters.',
             ),

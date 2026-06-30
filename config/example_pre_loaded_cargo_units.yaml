@@ -1,0 +1,28 @@
+# Example pre-loaded cargo units file for testing cargo_planner with
+# scripts/synthetic_container_occupancy_grid_publisher.py.
+#
+# The x, y and yaw coordinates are expressed relative to the container_frame
+# parameter used by scripts/synthetic_container_occupancy_grid_publisher.py.
+#
+# Recommended pallet footprints:
+#   - European pallet: size_x: 1.2, size_y: 0.8
+#   - American pallet: size_x: 1.219, size_y: 1.016
+#
+pre_loaded_cargo_units:
+  - x: 11.4
+    y: 1.93
+    yaw: 0.0
+    size_x: 1.2
+    size_y: 0.8
+
+  - x: 11.6
+    y: 0.6
+    yaw: 1.5707963267948966
+    size_x: 1.2
+    size_y: 0.8
+
+  - x: 10.1
+    y: 1.93
+    yaw: 0.0
+    size_x: 1.2
+    size_y: 0.8

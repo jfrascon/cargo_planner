@@ -34,15 +34,15 @@ ros2 launch cargo_planner cargo_planner.launch.py namespace:=cargo_plan
 # 2. Publish a synthetic container grid
 ros2 run cargo_planner synthetic_container_occupancy_grid_publisher.py \
   --ros-args \
-  -p container_length:=13.6 \
-  -p container_width:=2.4 \
-  -p pre_loaded_pallets:=0 \
+  -p container_frame:=container_frame \
+  -p container_inner_size_x:=13.6 \
+  -p container_inner_size_y:=2.4 \
   -r container_occupancy_grid:=container_inspector/container_occupancy_grid
 
 # 3. Forward the grid topic to the planner service
 ros2 run cargo_planner container_occupancy_grid_forwarder.py \
   --ros-args \
-  -p container_height:=2.38 \
+  -p container_inner_size_z:=2.38 \
   -r container_occupancy_grid:=container_inspector/container_occupancy_grid \
   -r container_occupancy_grid_registration:=cargo_plan/container_occupancy_grid_registration
 
@@ -55,9 +55,53 @@ ros2 service call /cargo_plan/cargo_list_registration \
 ros2 action send_goal /cargo_plan/cargo_planning cargo_planner_msgs/action/PlanCargo "{}"
 ```
 
+To mark cargo units that are already inside the container before planning, pass `pre_loaded_cargo_units_file` to `synthetic_container_occupancy_grid_publisher.py`. The file must use the structure shown in `config/example_pre_loaded_cargo_units.yaml`.
+
+The synthetic grid parameters `container_inner_size_x` and `container_inner_size_y` are internal container dimensions. They are measured along the X and Y axes of the `container_frame` passed to the publisher.
+
+## Algorithm visualizer
+
+The package also includes a documentation node that replays the main planning
+steps and writes PNG files for the deliverable figures. It subscribes to a
+container occupancy grid topic, loads the pallet list from a YAML file with the
+same `cargo_units:` structure used by `cargo_planner_msgs/srv/CargoListRegistration`,
+and saves intermediate images such as:
+
+- the input occupancy grid,
+- the pallet list ordered by volume,
+- the eroded free-space map,
+- the valid anchors for the first pallet at 0 and 90 degrees,
+- the selected anchor, and
+- the map after each placement.
+
+Example:
+
+```bash
+ros2 run cargo_planner cargo_planner_visualizer.py \
+  --ros-args \
+  -p occupancy_grid_topic:=/container_occupancy_grid \
+  -p pallets_yaml_file:=$(ros2 pkg prefix cargo_planner)/share/cargo_planner/scripts/example_visualizer_pallets.yaml \
+  -p output_dir:=tmp/cargo_planner_visualizer
+```
+
+For repeated test sessions, use the shell wrapper in
+`scripts/run_visualizer.sh`. Edit the defaults at the top of the
+file once and keep the command in the repository for later runs.
+
+The wrapper accepts positional arguments in this order:
+`occupancy_grid_topic`, `output_dir`, `pallets_yaml_file`, `container_height`,
+`occupied_threshold`, `pallet_margin`, `enable_rotation`, `one_shot`,
+`image_scale`.
+
+The node is intended for explanation and documentation only. It does not
+replace the production planner.
+
+If you prefer, you can also point `pallets_yaml_file` to any other YAML file
+with the same `cargo_units:` structure.
+
 ## Parameters
 
-The launch file loads `config/example_cargo_planner.yaml` by default. You can
+The launch file loads `config/default_cargo_planner.yaml` by default. You can
 pass `params_file:=/path/to/your.yaml` to use another file, and you can
 override individual parameters from the CLI.
 
@@ -90,8 +134,8 @@ override individual parameters from the CLI.
 
 - The container occupancy grid defines the `container_frame` used by the planner.
 - The planner reports each placement as the 3D center pose of the cargo unit in that frame.
-- The container length and width are inferred from the occupancy grid metadata.
-- The container height is provided in `container_occupancy_grid_registration` because it is not present in `nav_msgs/OccupancyGrid`.
+- The internal container size along X and Y is inferred from the occupancy grid metadata.
+- The internal container size along Z is provided to `container_occupancy_grid_forwarder.py` because it is not present in `nav_msgs/OccupancyGrid`.
 
 ## Notes
 

@@ -58,7 +58,11 @@ ament_python_install_package(${PROJECT_NAME})
 
 install(PROGRAMS scripts/synthetic_container_occupancy_grid_publisher.py
                  scripts/container_occupancy_grid_forwarder.py
+                 scripts/cargo_planner_visualizer.py
+                 scripts/run_visualizer.sh
         DESTINATION lib/${PROJECT_NAME})
+install(FILES scripts/example_visualizer_pallets.yaml
+        DESTINATION share/${PROJECT_NAME}/scripts)
 
 # ── Install ───────────────────────────────────────────────────────────────────
 
