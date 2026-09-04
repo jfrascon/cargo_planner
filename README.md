@@ -1,151 +1,239 @@
 # cargo_planner
 
-ROS2 node that plans how to place cargo units inside a container. The workflow is phased: first the container occupancy grid and the cargo list are registered, then the planning action is called to compute the placements and the free-space map.
+`cargo_planner` computes greedy 2D placements for rectangular cargo units inside a container
+occupancy grid.
+It provides a C++ planning library, a ROS 2 node, visualization output and development tools for
+creating synthetic inputs and algorithm figures.
 
-## Interfaces
+The planner is deterministic but not globally optimal.
+It places larger-volume cargo first and selects a deep wall-adjacent position for each unit.
 
-| Interface | Type | Description |
-|---|---|---|
-| `container_occupancy_grid_registration` | `cargo_planner_msgs/ContainerOccupancyGridRegistration` | Store the container grid map |
-| `cargo_list_registration` | `cargo_planner_msgs/CargoListRegistration` | Store the list of cargo units |
-| `cargo_planning` | `cargo_planner_msgs/action/PlanCargo` | Run the placement algorithm |
-| `cargo_markers` | `visualization_msgs/MarkerArray` | Publish cargo markers for RViz |
-| `container_free_map` | `nav_msgs/OccupancyGrid` | Publish the remaining free map |
+## Runtime data flow
 
-## Typical flow
+```text
+ContainerOccupancyGridRegistration ─┐
+                                    ├─> stored planner state ─> PlanCargo action
+CargoListRegistration ──────────────┘                             |
+                                                                  ├─ placements
+                                                                  ├─ cargo_markers
+                                                                  └─ container_free_map
+```
 
-Phase 1:
+The two registration services replace stored state.
+They may be called in either order, but both must succeed before a planning goal can execute.
 
-- Register the container occupancy grid.
-- Register the cargo list.
+## ROS 2 interfaces
 
-Phase 2:
+| Name | Type | Responsibility |
+| --- | --- | --- |
+| `container_occupancy_grid_registration` | `cargo_planner_msgs/srv/ContainerOccupancyGridRegistration` | Store the container map and height. |
+| `cargo_list_registration` | `cargo_planner_msgs/srv/CargoListRegistration` | Validate and store the cargo list. |
+| `cargo_planning` | `cargo_planner_msgs/action/PlanCargo` | Compute one plan from stored state. |
+| `cargo_markers` | `visualization_msgs/msg/MarkerArray` | Publish RViz cuboids for successful placements. |
+| `container_free_map` | `nav_msgs/msg/OccupancyGrid` | Publish the remaining usable grid. |
 
-- Call `cargo_planning`.
+A second action goal is rejected while one plan is running.
+Cancellation is checked before and after the non-interruptible planning step.
+The planning thread retains shared ownership of the node until it finishes.
 
-The two registrations can happen in any order. Both must be set before the planning action is sent. Calling them again replaces the stored data.
+The node snapshots the occupancy grid used by each plan.
+A later registration cannot make result poses or the free-map output use metadata from a different
+grid.
 
-## Quick start
+## Validation
+
+The planner rejects:
+
+- Occupancy thresholds outside `[0, 100]`.
+- Empty maps, non-binary core maps and inconsistent occupancy-grid data sizes.
+- Non-positive or non-finite grid resolution and container height.
+- Negative or non-finite pallet margin.
+- Empty cargo lists at the service boundary.
+- Blank or duplicate cargo IDs.
+- Non-positive or non-finite cargo dimensions.
+
+A valid cargo unit with `lz` greater than the container height is reported in `no_placed`.
+It is not a malformed request; it is a valid unit that does not fit.
+
+## Coordinate convention
+
+The occupancy-grid header identifies the frame used by all output poses and markers.
+
+Within that frame:
+
+- X follows grid columns from the door toward the back wall.
+- Y follows grid rows from the origin-side wall toward the opposite wall.
+- Z starts at the floor and points upward.
+
+The planner includes a non-zero `OccupancyGrid.info.origin` when converting grid anchors to output
+poses.
+A `CargoPlacement` has no header, so consumers must retain the registered grid frame as context.
+
+For an unrotated cargo unit, `lx` follows container X and `ly` follows container Y.
+For a rotated unit, the planner swaps those footprint extents and returns a `pi / 2` yaw.
+The output Z coordinate is `lz / 2`.
+
+## Planning algorithm
+
+The algorithm has two layers.
+
+### Collision layer
+
+The input occupancy grid is converted to a binary OpenCV image:
+
+- 255 represents free space.
+- 0 represents occupied or unknown space.
+
+The planner erodes free space by the configured pallet margin.
+For each cargo orientation, another rectangular erosion identifies every top-left anchor where the
+footprint fits completely.
+
+After placing a unit, its footprint plus margin is marked occupied.
+Later units therefore keep clearance from static obstacles and previously placed cargo.
+
+### Selection layer
+
+`GreedyPlacer` scans anchors from the back of the container toward the door.
+Successive successful placements alternate between the two lateral walls.
+When both orientations fit, the planner selects the orientation whose anchor lies deeper in the
+container and uses zero yaw to break a tie.
+
+Cargo units are sorted by descending `lx * ly * lz` before planning.
+The input service order is not preserved.
+
+## Area metrics
+
+The result reports:
+
+- `placed_area_m2`: physical footprint area of successful placements.
+- `free_area_m2`: remaining usable grid area after safety margins and placements.
+- `total_area_m2`: complete rectangular occupancy-grid area.
+- `utilization_pct`: `placed_area_m2 / total_area_m2 * 100`.
+
+The denominator includes cells that were initially occupied.
+The metric therefore measures utilization of the complete grid rectangle, not only its initially
+free cells.
+
+## Launch contract
+
+`cargo_planner.launch.py` exposes:
+
+| Argument | Default | Responsibility |
+| --- | --- | --- |
+| `namespace` | `cargo_planner` | Namespace where the node is launched. |
+| `params_file` | installed default YAML | Complete functional configuration. |
+| `params_file_allow_substs` | `False` | Allow ROS launch substitutions in the YAML file. |
+| `use_sim_time` | `False` | Select the ROS simulation clock. |
+| `node_args` | standard JSON | Configure supported `launch_ros.actions.Node` arguments. |
+
+The standard node arguments are:
+
+```json
+{"output":"both","ros_arguments":["--log-level","info"]}
+```
+
+The YAML file owns all functional parameters.
+`use_sim_time` is appended afterward because clock selection belongs to the launch environment.
+
+The obsolete `occupied_threshold`, `pallet_margin`, `enable_rotation`, `node_remappings`,
+`node_options` and `node_logging_options` launch arguments are no longer supported.
+Edit or replace the YAML for functional changes and use `node_args` for action behavior.
+
+## Parameters
+
+The installed `config/default_cargo_planner.yaml` defines:
+
+| Parameter | Default | Meaning |
+| --- | --- | --- |
+| `occupied_threshold` | `65` | Grid values at or above this value are occupied. |
+| `pallet_margin` | `0.05` | Non-negative safety clearance in meters. |
+| `enable_rotation` | `true` | Test both zero and 90-degree yaw. |
+
+Start the planner:
 
 ```bash
-# 1. Launch the node
-ros2 launch cargo_planner cargo_planner.launch.py namespace:=cargo_plan
+ros2 launch cargo_planner cargo_planner.launch.py
+```
 
-# 2. Publish a synthetic container grid
+Use another configuration:
+
+```bash
+ros2 launch cargo_planner cargo_planner.launch.py \
+  namespace:=cargo_plan \
+  params_file:=/absolute/path/to/cargo_planner.yaml
+```
+
+## Example call sequence
+
+Publish a synthetic container grid:
+
+```bash
 ros2 run cargo_planner synthetic_container_occupancy_grid_publisher.py \
   --ros-args \
   -p container_frame:=container_frame \
   -p container_inner_size_x:=13.6 \
   -p container_inner_size_y:=2.4 \
   -r container_occupancy_grid:=container_inspector/container_occupancy_grid
+```
 
-# 3. Forward the grid topic to the planner service
+Forward that grid to the registration service:
+
+```bash
 ros2 run cargo_planner container_occupancy_grid_forwarder.py \
   --ros-args \
   -p container_inner_size_z:=2.38 \
   -r container_occupancy_grid:=container_inspector/container_occupancy_grid \
   -r container_occupancy_grid_registration:=cargo_plan/container_occupancy_grid_registration
+```
 
-# 4. Register the cargo list
+Register cargo:
+
+```bash
 ros2 service call /cargo_plan/cargo_list_registration \
   cargo_planner_msgs/srv/CargoListRegistration \
   "{cargo_units: [{id: 'c1', lx: 1.2, ly: 0.8, lz: 1.5}, {id: 'c2', lx: 1.2, ly: 0.8, lz: 1.5}]}"
+```
 
-# 5. Run the planner
+Request a plan:
+
+```bash
 ros2 action send_goal /cargo_plan/cargo_planning cargo_planner_msgs/action/PlanCargo "{}"
 ```
 
-To mark cargo units that are already inside the container before planning, pass `pre_loaded_cargo_units_file` to `synthetic_container_occupancy_grid_publisher.py`. The file must use the structure shown in `config/example_pre_loaded_cargo_units.yaml`.
+## Development tools
 
-The synthetic grid parameters `container_inner_size_x` and `container_inner_size_y` are internal container dimensions. They are measured along the X and Y axes of the `container_frame` passed to the publisher.
+`synthetic_container_occupancy_grid_publisher.py` publishes a configurable test grid.
+Its optional pre-loaded cargo file uses the structure in
+`config/example_pre_loaded_cargo_units.yaml`.
 
-## Algorithm visualizer
+`container_occupancy_grid_forwarder.py` forwards grids to the registration service.
+In one-shot mode it stops after a successful response and retries when a request fails.
 
-The package also includes a documentation node that replays the main planning
-steps and writes PNG files for the deliverable figures. It subscribes to a
-container occupancy grid topic, loads the pallet list from a YAML file with the
-same `cargo_units:` structure used by `cargo_planner_msgs/srv/CargoListRegistration`,
-and saves intermediate images such as:
+`cargo_planner_visualizer.py` replays planning stages and writes explanatory PNG files.
+It is a documentation tool, not the production planner.
+The visualizer validates cargo units using the same ID and dimension rules as the C++ planner.
 
-- the input occupancy grid,
-- the pallet list ordered by volume,
-- the eroded free-space map,
-- the valid anchors for the first pallet at 0 and 90 degrees,
-- the selected anchor, and
-- the map after each placement.
+## Libraries
 
-Example:
+`cargo_planner_core` contains the ROS-independent planning algorithm and heuristic.
+`cargo_planner_ros_support` contains occupancy-grid conversion and ROS visualization helpers.
+Both targets are exported for downstream CMake consumers.
+The executable links both libraries and owns services, action handling and publishers.
 
-```bash
-ros2 run cargo_planner cargo_planner_visualizer.py \
-  --ros-args \
-  -p occupancy_grid_topic:=/container_occupancy_grid \
-  -p pallets_yaml_file:=$(ros2 pkg prefix cargo_planner)/share/cargo_planner/scripts/example_visualizer_pallets.yaml \
-  -p output_dir:=tmp/cargo_planner_visualizer
-```
+## Build and test
 
-For repeated test sessions, use the shell wrapper in
-`scripts/run_visualizer.sh`. Edit the defaults at the top of the
-file once and keep the command in the repository for later runs.
-
-The wrapper accepts positional arguments in this order:
-`occupancy_grid_topic`, `output_dir`, `pallets_yaml_file`, `container_height`,
-`occupied_threshold`, `pallet_margin`, `enable_rotation`, `one_shot`,
-`image_scale`.
-
-The node is intended for explanation and documentation only. It does not
-replace the production planner.
-
-If you prefer, you can also point `pallets_yaml_file` to any other YAML file
-with the same `cargo_units:` structure.
-
-## Parameters
-
-The launch file loads `config/default_cargo_planner.yaml` by default. You can
-pass `params_file:=/path/to/your.yaml` to use another file, and you can
-override individual parameters from the CLI.
-
-| Parameter | Default | Description |
-|---|---|---|
-| `occupied_threshold` | `65` | Cells at or above this value are treated as occupied |
-| `pallet_margin` | `0.05` | Safety margin used around obstacles [m] |
-| `enable_rotation` | `true` | Allow cargo units to be placed at 90 degrees yaw |
-
-## Cargo unit convention
-
-<img src="imgs/cargo_unit.png" width="45%">
-
-- A cargo unit is a rectangular load in the container XY plane.
-- The planner treats cargo as a rectangular footprint and does not model overhang beyond the pallet footprint.
-- `enable_rotation` controls whether the planner may also test the cargo unit at 90 degrees yaw.
-
-## Cargo frame convention
-
-<img src="imgs/cargo_axes.png" width="60%">
-
-- The cargo unit X axis follows the pallet length.
-- The cargo unit Y axis follows the pallet width.
-- The cargo unit Z axis is vertical.
-- `CargoPlacement.rotated` tells you whether the final placement uses the original orientation or the 90 degrees yaw orientation.
-
-## Container frame convention
-
-<img src="imgs/rotated_cargo.png" width="100%">
-
-- The container occupancy grid defines the `container_frame` used by the planner.
-- The planner reports each placement as the 3D center pose of the cargo unit in that frame.
-- The internal container size along X and Y is inferred from the occupancy grid metadata.
-- The internal container size along Z is provided to `container_occupancy_grid_forwarder.py` because it is not present in `nav_msgs/OccupancyGrid`.
-
-## Notes
-
-- The planner works with rectangular cargo units.
-- If `enable_rotation` is `false`, only the original orientation is considered.
-- The node publishes markers and the free map only after a successful planning action.
-
-## Tests
+From the workspace root:
 
 ```bash
-colcon test --packages-select cargo_planner
-colcon test-result --verbose
+source /opt/ros/jazzy/setup.bash
+colcon build --merge-install --symlink-install --packages-select cargo_planner_msgs cargo_planner
+source install/setup.bash
+colcon test --merge-install --packages-select cargo_planner_msgs cargo_planner
+colcon test-result --test-result-base build/cargo_planner_msgs --verbose
+colcon test-result --test-result-base build/cargo_planner --verbose
 ```
+
+## License
+
+This package is distributed under the Apache License 2.0.
+See [LICENSE](LICENSE).

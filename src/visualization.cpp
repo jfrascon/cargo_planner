@@ -49,22 +49,22 @@ namespace cargo_planner
 
       // Yaw quaternion: 0° → identity; 90° → rotation around Z
       const double yaw = p.rotated ? (M_PI / 2.0) : 0.0;
-      const double qz  = std::sin(yaw / 2.0);
-      const double qw  = std::cos(yaw / 2.0);
+      const double qz = std::sin(yaw / 2.0);
+      const double qw = std::cos(yaw / 2.0);
 
       const auto& color = PALETTE[i % PALETTE.size()];
 
       visualization_msgs::msg::Marker marker;
       marker.header.frame_id = frame_id;
-      marker.header.stamp    = stamp;
-      marker.ns              = "cargo_plan";
-      marker.id              = static_cast<int>(i);
-      marker.type            = visualization_msgs::msg::Marker::CUBE;
-      marker.action          = visualization_msgs::msg::Marker::ADD;
+      marker.header.stamp = stamp;
+      marker.ns = "cargo_plan";
+      marker.id = static_cast<int>(i);
+      marker.type = visualization_msgs::msg::Marker::CUBE;
+      marker.action = visualization_msgs::msg::Marker::ADD;
 
-      marker.pose.position.x    = x_center;
-      marker.pose.position.y    = y_center;
-      marker.pose.position.z    = z_center;
+      marker.pose.position.x = x_center;
+      marker.pose.position.y = y_center;
+      marker.pose.position.z = z_center;
       marker.pose.orientation.x = 0.0;
       marker.pose.orientation.y = 0.0;
       marker.pose.orientation.z = qz;
@@ -94,8 +94,8 @@ namespace cargo_planner
     visualization_msgs::msg::MarkerArray array;
     visualization_msgs::msg::Marker del;
     del.header.frame_id = frame_id;
-    del.header.stamp    = stamp;
-    del.action          = visualization_msgs::msg::Marker::DELETEALL;
+    del.header.stamp = stamp;
+    del.action = visualization_msgs::msg::Marker::DELETEALL;
     array.markers.push_back(std::move(del));
     return array;
   }

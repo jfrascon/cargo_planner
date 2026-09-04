@@ -12,6 +12,11 @@ namespace cargo_planner
 
   cv::Mat occupancyGridToMat(const nav_msgs::msg::OccupancyGrid& grid, int occupied_threshold)
   {
+    if(occupied_threshold < 0 || occupied_threshold > 100)
+    {
+      throw std::invalid_argument("occupancyGridToMat: occupied_threshold must be in [0, 100]");
+    }
+
     const int nx = static_cast<int>(grid.info.width);   // X cells (door → back wall)
     const int ny = static_cast<int>(grid.info.height);  // Y cells (right → left wall)
 
@@ -63,14 +68,14 @@ namespace cargo_planner
 
     nav_msgs::msg::OccupancyGrid result;
     result.header = ref.header;
-    result.info   = ref.info;
+    result.info = ref.info;
     result.data.resize(static_cast<std::size_t>(mat.rows * mat.cols));
 
     for(int row = 0; row < mat.rows; ++row)
     {
       for(int col = 0; col < mat.cols; ++col)
       {
-        const int idx                              = row * mat.cols + col;
+        const int idx = row * mat.cols + col;
         result.data[static_cast<std::size_t>(idx)] = (mat.at<uint8_t>(row, col) == 0) ? 100 : 0;
       }
     }

@@ -1,5 +1,5 @@
-# All parameters can be overridden in CLI:
-#   ros2 launch cargo_planner cargo_planner.launch.py params_file:=/path/to/custom.yaml pallet_margin:=0.1 enable_rotation:=false ...
+# This file owns the planner's functional parameters.
+# The launch file configures use_sim_time separately.
 
 /**/cargo_planner:
   ros__parameters:

@@ -37,23 +37,23 @@ namespace cargo_planner
   class PlacementHeuristic
   {
     public:
-    virtual ~PlacementHeuristic() = default;
+      virtual ~PlacementHeuristic() = default;
 
-    /**
-     * @brief Select the best anchor from a valid-anchor image.
-     *
-     * @param valid_anchors     Binary cv::Mat (255 = valid, 0 = invalid).
-     *                          White pixels are positions where the pallet
-     *                          fits without collision.
-     * @param prefer_right_wall If true, prefer anchors near the right wall
-     *                          (minimum Y = minimum row).  If false, prefer
-     *                          anchors near the left wall (maximum Y = maximum row).
-     *                          This flag alternates between consecutive pallets
-     *                          to implement the wall-hugging strategy.
-     * @return The selected anchor as cv::Point(col, row), or cv::Point(-1, -1)
-     *         if no valid anchor exists in @p valid_anchors.
-     */
-    virtual cv::Point select(const cv::Mat& valid_anchors, bool prefer_right_wall) const = 0;
+      /**
+       * @brief Select the best anchor from a valid-anchor image.
+       *
+       * @param valid_anchors     Binary cv::Mat (255 = valid, 0 = invalid).
+       *                          White pixels are positions where the pallet
+       *                          fits without collision.
+       * @param prefer_right_wall If true, prefer anchors near the right wall
+       *                          (minimum Y = minimum row).  If false, prefer
+       *                          anchors near the left wall (maximum Y = maximum row).
+       *                          This flag alternates between consecutive pallets
+       *                          to implement the wall-hugging strategy.
+       * @return The selected anchor as cv::Point(col, row), or cv::Point(-1, -1)
+       *         if no valid anchor exists in @p valid_anchors.
+       */
+      virtual cv::Point select(const cv::Mat& valid_anchors, bool prefer_right_wall) const = 0;
   };
 
 }  // namespace cargo_planner

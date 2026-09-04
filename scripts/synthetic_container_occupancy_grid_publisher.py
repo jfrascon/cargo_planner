@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
 """
-This is a utility node for testing the `cargo_planner` node without a real robot. It is not intended
-for production use.
+Publish a synthetic occupancy grid for an empty or partially loaded container.
 
-Publish a synthetic OccupancyGrid representing an empty or partially loaded container interior on a
-ROS topic.
+This utility supports tests without a real robot and is not intended for production use.
 
 Parameters
 ----------
@@ -37,18 +35,19 @@ Usage
   ros2 run cargo_planner container_occupancy_grid_forwarder.py --ros-args \
     -r container_occupancy_grid:=myrobot/container_occupancy_grid \
     -r container_occupancy_grid_registration:=cargo_planner/container_occupancy_grid_registration
+
 """
 
-import math
 from collections.abc import Mapping
+import math
 from pathlib import Path
 
-import rclpy
-import yaml
 from geometry_msgs.msg import Pose
 from nav_msgs.msg import MapMetaData, OccupancyGrid
+import rclpy
 from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, QoSProfile
+import yaml
 
 
 class SyntheticContainerOccupancyGridPublisher(Node):
@@ -72,7 +71,9 @@ class SyntheticContainerOccupancyGridPublisher(Node):
         self._res = self._positive_float_parameter('resolution')
         self._free_cell_value = self._occupancy_value_parameter('free_cell_value')
         self._occupied_cell_value = self._occupancy_value_parameter('occupied_cell_value')
-        self._pre_loaded_cargo_units_file = self._optional_string_parameter('pre_loaded_cargo_units_file')
+        self._pre_loaded_cargo_units_file = self._optional_string_parameter(
+            'pre_loaded_cargo_units_file'
+        )
 
         latch_qos = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL)
         self._pub = self.create_publisher(OccupancyGrid, 'container_occupancy_grid', latch_qos)
@@ -129,6 +130,7 @@ class SyntheticContainerOccupancyGridPublisher(Node):
             return []
 
         cargo_units_file = Path(str(self._pre_loaded_cargo_units_file)).expanduser()
+
         if not cargo_units_file.is_file():
             raise FileNotFoundError(f"Cargo units YAML file '{cargo_units_file}' does not exist")
 
@@ -137,13 +139,17 @@ class SyntheticContainerOccupancyGridPublisher(Node):
 
         if content is None:
             return []
+
         if not isinstance(content, Mapping):
-            raise ValueError("Cargo units YAML file must contain a mapping with key 'pre_loaded_cargo_units'")
+            raise ValueError(
+                "Cargo units YAML file must contain a mapping with key 'pre_loaded_cargo_units'"
+            )
 
         if 'pre_loaded_cargo_units' not in content:
             raise ValueError("Cargo units YAML file must contain key 'pre_loaded_cargo_units'")
 
         cargo_units = content['pre_loaded_cargo_units']
+
         if not isinstance(cargo_units, list):
             raise ValueError("'pre_loaded_cargo_units' must be a list")
 
@@ -161,7 +167,9 @@ class SyntheticContainerOccupancyGridPublisher(Node):
         size_y = self._required_float(cargo_unit, 'size_y', index)
 
         if size_x <= 0.0 or size_y <= 0.0:
-            raise ValueError(f'pre_loaded_cargo_units[{index}] size_x and size_y must be greater than 0')
+            raise ValueError(
+                f'pre_loaded_cargo_units[{index}] size_x and size_y must be greater than 0'
+            )
 
         if self._is_parallel_to_x_axis(yaw):
             effective_size_x = size_x
@@ -171,7 +179,8 @@ class SyntheticContainerOccupancyGridPublisher(Node):
             effective_size_y = size_x
         else:
             raise ValueError(
-                f'pre_loaded_cargo_units[{index}] yaw={yaw} rad is invalid. Only multiples of pi/2 rad are supported.'
+                f'pre_loaded_cargo_units[{index}] yaw={yaw} rad is invalid. '
+                'Only multiples of pi/2 rad are supported.'
             )
 
         x_min = x - effective_size_x * 0.5
@@ -189,7 +198,9 @@ class SyntheticContainerOccupancyGridPublisher(Node):
 
         self._mark_rectangle(data, x_min, x_max, y_min, y_max)
 
-    def _mark_rectangle(self, data: list[int], x_min: float, x_max: float, y_min: float, y_max: float) -> None:
+    def _mark_rectangle(
+        self, data: list[int], x_min: float, x_max: float, y_min: float, y_max: float
+    ) -> None:
         """Mark every grid cell touched by an axis-aligned rectangle as occupied."""
         col_start = max(0, math.floor(x_min / self._res))
         col_end = min(self._nx, math.ceil(x_max / self._res))
@@ -219,25 +230,35 @@ class SyntheticContainerOccupancyGridPublisher(Node):
         """Return a string parameter after rejecting empty or whitespace-padded values."""
         value = self.get_parameter(name).value
         if not isinstance(value, str) or not value.strip() or value != value.strip():
-            raise ValueError(f"Parameter '{name}' must be a non-empty string without surrounding whitespace")
+            raise ValueError(
+                f"Parameter '{name}' must be a non-empty string without surrounding whitespace"
+            )
         return value
 
     def _optional_string_parameter(self, name: str) -> str:
         """Return an optional string parameter, converting None to an empty string."""
         value = self.get_parameter(name).value
+
         if value is None:
             return ''
+
         if not isinstance(value, str):
             raise ValueError(f"Parameter '{name}' must be a string")
+
         if value and (not value.strip() or value != value.strip()):
-            raise ValueError(f"Parameter '{name}' must be empty or a string without surrounding whitespace")
+            raise ValueError(
+                f"Parameter '{name}' must be empty or a string without surrounding whitespace"
+            )
+
         return value
 
     def _occupancy_value_parameter(self, name: str) -> int:
         """Return an OccupancyGrid cell value in the documented [-1, 100] range."""
         value = self._int_parameter(name)
+
         if value < -1 or value > 100:
             raise ValueError(f"Parameter '{name}' must be between -1 and 100")
+
         return value
 
     def _positive_float_parameter(self, name: str) -> float:
@@ -245,19 +266,24 @@ class SyntheticContainerOccupancyGridPublisher(Node):
         value = self.get_parameter(name).value
         if isinstance(value, bool):
             raise ValueError(f"Parameter '{name}' must be numeric")
+
         try:
             number = float(value)
         except (TypeError, ValueError) as exc:
             raise ValueError(f"Parameter '{name}' must be numeric") from exc
+
         if not math.isfinite(number) or number <= 0.0:
             raise ValueError(f"Parameter '{name}' must be greater than 0")
+
         return number
 
     def _int_parameter(self, name: str) -> int:
         """Return an integer parameter after rejecting bool and non-integer values."""
         value = self.get_parameter(name).value
+
         if isinstance(value, bool) or not isinstance(value, int):
             raise ValueError(f"Parameter '{name}' must be an integer")
+
         return value
 
     @staticmethod
@@ -265,14 +291,20 @@ class SyntheticContainerOccupancyGridPublisher(Node):
         """Return a required cargo unit field as a finite float."""
         if key not in item:
             raise ValueError(f"pre_loaded_cargo_units[{index}] is missing required key '{key}'")
+
         if isinstance(item[key], bool):
             raise ValueError(f"pre_loaded_cargo_units[{index}] key '{key}' must be numeric")
+
         try:
             value = float(item[key])
         except (TypeError, ValueError) as exc:
-            raise ValueError(f"pre_loaded_cargo_units[{index}] key '{key}' must be numeric") from exc
+            raise ValueError(
+                f"pre_loaded_cargo_units[{index}] key '{key}' must be numeric"
+            ) from exc
+
         if not math.isfinite(value):
             raise ValueError(f"pre_loaded_cargo_units[{index}] key '{key}' must be finite")
+
         return value
 
 
@@ -280,6 +312,7 @@ def main(args=None):
     """Initialize ROS, run the synthetic publisher node, and shut it down cleanly."""
     rclpy.init(args=args)
     node = None
+
     try:
         node = SyntheticContainerOccupancyGridPublisher()
         rclpy.spin(node)

@@ -36,10 +36,8 @@
  *     the map and cargo list already stored. The server:
  *       1. Accepts the goal immediately.
  *       2. Publishes a feedback message: "computing... (N cargo units)".
- *       3. Runs the CPU-intensive plan() in the calling thread (which is
- *          a detached std::thread, so the ROS executor is not blocked).
- *       4. Returns the full placement result on success, or aborts with a
- *          descriptive error message if a precondition is not met.
+ *       3. Runs the CPU-intensive plan() in a detached thread so the ROS executor remains free.
+ *       4. Reports the final placed count and returns the complete result.
  *     Concurrent cargo_planning goals are rejected.
  *
  * Topics published
@@ -54,9 +52,8 @@
  *
  * Parameters (see config/default_cargo_planner.yaml)
  * ------------------------------------------
- *   truck_frame          TF frame of the truck interior.
  *   occupied_threshold   Cells >= this value are treated as occupied [0..100].
- *   pallet_margin        Safety clearance around obstacles [m].
+ *   pallet_margin        Non-negative finite safety clearance around obstacles [m].
  *   enable_rotation      Whether the planner may place cargo at 90 degrees yaw.
  */
 
@@ -82,105 +79,103 @@
 namespace cargo_planner
 {
 
-class CargoPlacerNode: public rclcpp::Node
-{
-  public:
-  explicit CargoPlacerNode(const rclcpp::NodeOptions& options = rclcpp::NodeOptions{});
+  class CargoPlacerNode: public rclcpp::Node
+  {
+    public:
+      explicit CargoPlacerNode(const rclcpp::NodeOptions& options = rclcpp::NodeOptions{});
 
-  private:
-  // ── Type aliases ────────────────────────────────────────────────────────
+    private:
+      // Type aliases
 
-  using PlanCargoAction     = cargo_planner_msgs::action::PlanCargo;
-  using GoalHandlePlanCargo = rclcpp_action::ServerGoalHandle<PlanCargoAction>;
+      using PlanCargoAction = cargo_planner_msgs::action::PlanCargo;
+      using GoalHandlePlanCargo = rclcpp_action::ServerGoalHandle<PlanCargoAction>;
 
-  // ── Service handlers ────────────────────────────────────────────────────
+      // Service handlers
 
-  void onContainerOccupancyGridRegistration(
-    const std::shared_ptr<cargo_planner_msgs::srv::ContainerOccupancyGridRegistration::Request> req,
-    std::shared_ptr<cargo_planner_msgs::srv::ContainerOccupancyGridRegistration::Response> res);
+      void onContainerOccupancyGridRegistration(
+        const std::shared_ptr<cargo_planner_msgs::srv::ContainerOccupancyGridRegistration::Request> req,
+        std::shared_ptr<cargo_planner_msgs::srv::ContainerOccupancyGridRegistration::Response> res);
 
-  void onCargoListRegistration(const std::shared_ptr<cargo_planner_msgs::srv::CargoListRegistration::Request> req,
-                               std::shared_ptr<cargo_planner_msgs::srv::CargoListRegistration::Response> res);
+      void onCargoListRegistration(const std::shared_ptr<cargo_planner_msgs::srv::CargoListRegistration::Request> req,
+                                   std::shared_ptr<cargo_planner_msgs::srv::CargoListRegistration::Response> res);
 
-  // ── Action server callbacks ──────────────────────────────────────────────
+      // Action server callbacks
 
-  /**
-   * @brief Called when a new cargo_planning goal is received.
-   *
-   * Always accepts unless another plan is already running.
-   */
-  rclcpp_action::GoalResponse onGoalReceived(const rclcpp_action::GoalUUID& uuid,
-                                             std::shared_ptr<const PlanCargoAction::Goal> goal);
+      /**
+       * @brief Called when a new cargo_planning goal is received.
+       *
+       * Always accepts unless another plan is already running.
+       */
+      rclcpp_action::GoalResponse onGoalReceived(const rclcpp_action::GoalUUID& uuid,
+                                                 std::shared_ptr<const PlanCargoAction::Goal> goal);
 
-  /** @brief Called when the action client requests a cancel.  Always accepted. */
-  rclcpp_action::CancelResponse onCancelReceived(std::shared_ptr<GoalHandlePlanCargo> handle);
+      /** @brief Called when the action client requests a cancel.  Always accepted. */
+      rclcpp_action::CancelResponse onCancelReceived(std::shared_ptr<GoalHandlePlanCargo> handle);
 
-  /**
-   * @brief Called when the goal has been accepted.  Detaches a thread that
-   *        runs the CPU-intensive plan() so the ROS executor is not blocked.
-   */
-  void onGoalAccepted(std::shared_ptr<GoalHandlePlanCargo> handle);
+      /**
+       * @brief Detach a planning thread while retaining shared ownership of the node.
+       */
+      void onGoalAccepted(std::shared_ptr<GoalHandlePlanCargo> handle);
 
-  /**
-   * @brief Entry point of the planning thread.
-   *
-   * Publishes feedback, runs plan(), fills the result, publishes RViz
-   * markers, and calls handle->succeed() or handle->abort().
-   */
-  void executePlan(std::shared_ptr<GoalHandlePlanCargo> handle);
+      /**
+       * @brief Entry point of the planning thread.
+       *
+       * Publishes feedback, runs plan(), fills the result, publishes RViz
+       * markers, and calls handle->succeed() or handle->abort().
+       */
+      void executePlan(std::shared_ptr<GoalHandlePlanCargo> handle);
 
-  // ── Helpers ─────────────────────────────────────────────────────────────
+      // Helpers
 
-  /** @brief Convert ROS CargoUnit msg to internal type. */
-  static CargoUnit fromMsg(const cargo_planner_msgs::msg::CargoUnit& msg);
+      /** @brief Convert ROS CargoUnit msg to internal type. */
+      static CargoUnit fromMsg(const cargo_planner_msgs::msg::CargoUnit& msg);
 
-  /**
-   * @brief Convert internal PlacementResult to ROS CargoPlacement msg.
-   *
-   * Positions are expressed in metres relative to the grid origin
-   * (origin_x, origin_y), which corresponds to cell (0,0) of the
-   * OccupancyGrid.  For truck_inspector grids this is the bottom-right
-   * door corner of the truck container.
-   *
-   * @param r         Placement result from the planner.
-   * @param resolution Cell size [m].
-   * @param origin_x  X coordinate of cell (0,0) in the grid frame [m].
-   * @param origin_y  Y coordinate of cell (0,0) in the grid frame [m].
-   */
-  static cargo_planner_msgs::msg::CargoPlacement toMsg(const PlacementResult& r,
-                                                       double resolution,
-                                                       double origin_x,
-                                                       double origin_y);
+      /**
+       * @brief Convert internal PlacementResult to ROS CargoPlacement msg.
+       *
+       * Positions are expressed in metres relative to the grid origin
+       * (origin_x, origin_y), which corresponds to cell (0,0) of the
+       * OccupancyGrid.  For truck_inspector grids this is the bottom-right
+       * door corner of the truck container.
+       *
+       * @param r         Placement result from the planner.
+       * @param resolution Cell size [m].
+       * @param origin_x  X coordinate of cell (0,0) in the grid frame [m].
+       * @param origin_y  Y coordinate of cell (0,0) in the grid frame [m].
+       */
+      static cargo_planner_msgs::msg::CargoPlacement toMsg(const PlacementResult& r,
+                                                           double resolution,
+                                                           double origin_x,
+                                                           double origin_y);
 
-  // ── ROS interfaces ───────────────────────────────────────────────────────
+      // ROS interfaces
 
-  rclcpp::Service<cargo_planner_msgs::srv::ContainerOccupancyGridRegistration>::SharedPtr
-    srv_container_occupancy_grid_registration_;
-  rclcpp::Service<cargo_planner_msgs::srv::CargoListRegistration>::SharedPtr srv_cargo_list_registration_;
+      rclcpp::Service<cargo_planner_msgs::srv::ContainerOccupancyGridRegistration>::SharedPtr
+        srv_container_occupancy_grid_registration_;
+      rclcpp::Service<cargo_planner_msgs::srv::CargoListRegistration>::SharedPtr srv_cargo_list_registration_;
 
-  rclcpp_action::Server<PlanCargoAction>::SharedPtr action_plan_cargo_;
+      rclcpp_action::Server<PlanCargoAction>::SharedPtr action_plan_cargo_;
 
-  rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr pub_markers_;
-  rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr pub_free_map_;
+      rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr pub_markers_;
+      rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr pub_free_map_;
 
-  // ── Shared state (protected by state_mutex_) ────────────────────────────
+      // Shared state (protected by state_mutex_)
 
-  mutable std::mutex state_mutex_;
-  CargoPlanner planner_;
-  nav_msgs::msg::OccupancyGrid::SharedPtr current_grid_;  ///< Last received truck grid.
-  bool has_map_{false};
-  bool has_cargo_units_{false};
-  std::size_t cargo_count_{0};  ///< Number of cargo units in the current list.
+      mutable std::mutex state_mutex_;
+      CargoPlanner planner_;
+      nav_msgs::msg::OccupancyGrid::SharedPtr current_grid_;  ///< Last received truck grid.
+      bool has_map_{false};
+      bool has_cargo_units_{false};
+      std::size_t cargo_count_{0};  ///< Number of cargo units in the current list.
 
-  /// Guards against concurrent cargo_planning goals.
-  std::atomic<bool> planning_{false};
+      /// Guards against concurrent cargo_planning goals.
+      std::atomic<bool> planning_{false};
 
-  // ── Parameters ──────────────────────────────────────────────────────────
+      // Parameters
 
-  int occupied_threshold_;
-  double pallet_margin_;
-  bool enable_rotation_;
-
-};
+      int occupied_threshold_;
+      double pallet_margin_;
+      bool enable_rotation_;
+  };
 
 }  // namespace cargo_planner

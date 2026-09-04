@@ -16,6 +16,7 @@
 #include <gtest/gtest.h>
 
 #include <cmath>
+#include <limits>
 
 #include <opencv2/core.hpp>
 
@@ -23,11 +24,11 @@
 #include "cargo_planner/greedy_placer.hpp"
 
 using cargo_planner::CargoPlanner;
-using cargo_planner::GreedyPlacer;
 using cargo_planner::CargoUnit;
+using cargo_planner::GreedyPlacer;
 using cargo_planner::PlacementResult;
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// Helpers
 
 /// Build a CargoPlanner with GreedyPlacer and zero pallet_margin.
 static CargoPlanner makePlanner()
@@ -43,7 +44,7 @@ static CargoUnit makeCargoUnit(const std::string& id, double lx, double ly, doub
   return {id, lx, ly, lz};
 }
 
-// ── Empty truck ───────────────────────────────────────────────────────────────
+// Empty truck
 
 TEST(CargoPlanner, EmptyTruckPlacesAllCargoUnits)
 {
@@ -62,7 +63,7 @@ TEST(CargoPlanner, EmptyTruckPlacesAllCargoUnits)
   EXPECT_GT(result.placed_area_m2, 0.0);
 }
 
-// ── Full truck ────────────────────────────────────────────────────────────────
+// Full truck
 
 TEST(CargoPlanner, FullTruckPlacesNoCargoUnits)
 {
@@ -80,7 +81,7 @@ TEST(CargoPlanner, FullTruckPlacesNoCargoUnits)
   EXPECT_EQ(result.no_placed[0], "c1");
 }
 
-// ── Cargo unit too large ──────────────────────────────────────────────────────
+// Cargo unit too large
 
 TEST(CargoPlanner, CargoUnitTooLargeForTruck)
 {
@@ -100,7 +101,7 @@ TEST(CargoPlanner, CargoUnitTooLargeForTruck)
   EXPECT_EQ(result.no_placed[0], "big");
 }
 
-// ── Rotation selection ────────────────────────────────────────────────────────
+// Rotation selection
 
 TEST(CargoPlanner, WideCargoUnitIsRotatedInNarrowTruck)
 {
@@ -143,7 +144,7 @@ TEST(CargoPlanner, WideCargoUnitIsNotPlacedWhenRotationIsDisabled)
   EXPECT_EQ(result.no_placed[0], "c1");
 }
 
-// ── Wall-hugging ──────────────────────────────────────────────────────────────
+// Wall-hugging
 
 TEST(CargoPlanner, ConsecutiveCargoUnitsOnOppositeWalls)
 {
@@ -161,7 +162,7 @@ TEST(CargoPlanner, ConsecutiveCargoUnitsOnOppositeWalls)
 
   ASSERT_EQ(result.placements.size(), 2u);
 
-  const auto& first  = result.placements[0];
+  const auto& first = result.placements[0];
   const auto& second = result.placements[1];
 
   // First cargo unit: anchored at row=0 (right wall)
@@ -172,7 +173,7 @@ TEST(CargoPlanner, ConsecutiveCargoUnitsOnOppositeWalls)
   EXPECT_GT(second.anchor_row, first.anchor_row);
 }
 
-// ── Anchor placement deep in truck ───────────────────────────────────────────
+// Anchor placement deep in truck
 
 TEST(CargoPlanner, CargoUnitsPlacedAtBackOfTruck)
 {
@@ -195,7 +196,7 @@ TEST(CargoPlanner, CargoUnitsPlacedAtBackOfTruck)
   EXPECT_EQ(result.placements[0].anchor_col, 42);
 }
 
-// ── Idempotency ───────────────────────────────────────────────────────────────
+// Idempotency
 
 TEST(CargoPlanner, PlanIsIdempotent)
 {
@@ -217,7 +218,7 @@ TEST(CargoPlanner, PlanIsIdempotent)
   }
 }
 
-// ── Ready guard ───────────────────────────────────────────────────────────────
+// Ready guard
 
 TEST(CargoPlanner, NotReadyWithoutMapOrCargoUnits)
 {
@@ -241,7 +242,77 @@ TEST(CargoPlanner, PlanThrowsWithoutCargoUnits)
   EXPECT_THROW(planner.plan(), std::runtime_error);
 }
 
-// ── Pallet margin ─────────────────────────────────────────────────────────────
+TEST(CargoPlanner, RejectsInvalidConfiguration)
+{
+  CargoPlanner::Config cfg;
+  cfg.pallet_margin = -0.1;
+  EXPECT_THROW(CargoPlanner(std::make_unique<GreedyPlacer>(), cfg), std::invalid_argument);
+
+  cfg.pallet_margin = std::numeric_limits<double>::quiet_NaN();
+  EXPECT_THROW(CargoPlanner(std::make_unique<GreedyPlacer>(), cfg), std::invalid_argument);
+}
+
+TEST(CargoPlanner, RejectsInvalidFreeSpaceMetadata)
+{
+  auto planner = makePlanner();
+  cv::Mat free_map(10, 10, CV_8UC1, cv::Scalar(255));
+
+  EXPECT_THROW(planner.setFreeSpace(free_map, 0.0, 2.5), std::invalid_argument);
+  EXPECT_THROW(planner.setFreeSpace(free_map, std::numeric_limits<double>::infinity(), 2.5), std::invalid_argument);
+  EXPECT_THROW(planner.setFreeSpace(free_map, 0.1, 0.0), std::invalid_argument);
+  EXPECT_THROW(planner.setFreeSpace(free_map, 0.1, std::numeric_limits<double>::quiet_NaN()), std::invalid_argument);
+}
+
+TEST(CargoPlanner, RejectsNonBinaryFreeSpace)
+{
+  auto planner = makePlanner();
+  cv::Mat grey_map(10, 10, CV_8UC1, cv::Scalar(127));
+  cv::Mat float_map(10, 10, CV_32FC1, cv::Scalar(1.0));
+
+  EXPECT_THROW(planner.setFreeSpace(grey_map, 0.1, 2.5), std::invalid_argument);
+  EXPECT_THROW(planner.setFreeSpace(float_map, 0.1, 2.5), std::invalid_argument);
+}
+
+TEST(CargoPlanner, OwnsACopyOfFreeSpace)
+{
+  auto planner = makePlanner();
+  cv::Mat free_map(10, 10, CV_8UC1, cv::Scalar(255));
+  planner.setFreeSpace(free_map, 0.1, 2.5);
+  planner.setCargoUnits({makeCargoUnit("cargo", 0.5, 0.5)});
+
+  free_map.setTo(0);
+  const auto result = planner.plan();
+
+  EXPECT_EQ(result.placements.size(), 1u);
+}
+
+TEST(CargoPlanner, RejectsInvalidCargoUnits)
+{
+  auto planner = makePlanner();
+
+  EXPECT_THROW(planner.setCargoUnits({makeCargoUnit("", 1.0, 1.0)}), std::invalid_argument);
+  EXPECT_THROW(planner.setCargoUnits({makeCargoUnit("cargo", 0.0, 1.0)}), std::invalid_argument);
+  EXPECT_THROW(planner.setCargoUnits({makeCargoUnit("cargo", std::numeric_limits<double>::quiet_NaN(), 1.0)}),
+               std::invalid_argument);
+  EXPECT_THROW(planner.setCargoUnits({makeCargoUnit("cargo", 1.0, 1.0), makeCargoUnit("cargo", 0.5, 0.5)}),
+               std::invalid_argument);
+}
+
+TEST(CargoPlanner, CargoUnitTallerThanContainerIsNotPlaced)
+{
+  auto planner = makePlanner();
+  cv::Mat free_map(10, 10, CV_8UC1, cv::Scalar(255));
+  planner.setFreeSpace(free_map, 0.1, 2.0);
+  planner.setCargoUnits({makeCargoUnit("tall", 0.5, 0.5, 2.1)});
+
+  const auto result = planner.plan();
+
+  EXPECT_TRUE(result.placements.empty());
+  ASSERT_EQ(result.no_placed.size(), 1u);
+  EXPECT_EQ(result.no_placed[0], "tall");
+}
+
+// Pallet margin
 
 TEST(CargoPlanner, MarginPreventsAdjacentPallets)
 {
@@ -262,7 +333,7 @@ TEST(CargoPlanner, MarginPreventsAdjacentPallets)
   // This test would have FAILED before the markOccupied fix because the old
   // code painted only the exact footprint (not footprint+margin) as occupied,
   // allowing cargo unit B to anchor at col=18 (gap=0) instead of col<=8.
-  const double res    = 0.1;
+  const double res = 0.1;
   const double margin = 0.1;  // 1 cell
 
   cv::Mat free_map(10, 30, CV_8UC1, cv::Scalar(255));
@@ -279,7 +350,7 @@ TEST(CargoPlanner, MarginPreventsAdjacentPallets)
 
   // placements[0] = cargo unit placed first (deeper = higher anchor_col)
   // placements[1] = cargo unit placed second (shallower = lower anchor_col)
-  const auto& deeper    = result.placements[0];
+  const auto& deeper = result.placements[0];
   const auto& shallower = result.placements[1];
 
   EXPECT_GT(deeper.anchor_col, shallower.anchor_col);
@@ -288,13 +359,13 @@ TEST(CargoPlanner, MarginPreventsAdjacentPallets)
   // footprint of shallower ends at: shallower.anchor_col + eff_kcols
   // footprint of deeper starts at:  deeper.anchor_col
   // gap = deeper.anchor_col - (shallower.anchor_col + eff_kcols) >= margin_cells
-  const int eff_kcols    = static_cast<int>(std::ceil(1.0 / res));     // 10
+  const int eff_kcols = static_cast<int>(std::ceil(1.0 / res));        // 10
   const int margin_cells = static_cast<int>(std::ceil(margin / res));  // 1
 
   EXPECT_GE(deeper.anchor_col, shallower.anchor_col + eff_kcols + margin_cells);
 }
 
-// ── Area metrics ──────────────────────────────────────────────────────────────
+// Area metrics
 
 TEST(CargoPlanner, TotalAreaIsCorrect)
 {
@@ -304,10 +375,12 @@ TEST(CargoPlanner, TotalAreaIsCorrect)
 
   auto planner = makePlanner();
   planner.setFreeSpace(free_map, res, 2.5);
-  planner.setCargoUnits({});  // empty list → nothing to place
+  planner.setCargoUnits({makeCargoUnit("too_tall", 0.2, 0.2, 3.0)});
 
-  // We need at least an empty list for plan() to work.
-  EXPECT_THROW(planner.plan(), std::runtime_error);  // has_cargo_units_ = false with empty list
+  const auto result = planner.plan();
+
+  EXPECT_DOUBLE_EQ(result.total_area_m2, 0.5);
+  EXPECT_TRUE(result.placements.empty());
 }
 
 int main(int argc, char** argv)

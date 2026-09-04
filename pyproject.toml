@@ -1,0 +1,51 @@
+# ==============================================================================
+# Ruff configuration (formatter + linter)
+# ==============================================================================
+[tool.ruff]
+line-length = 100
+# Treat modules below the repository root and its "src" directory as first-party.
+# These are Ruff's default source roots, declared explicitly for clarity.
+src = [".", "src"]
+
+[tool.ruff.format]
+# Use single quotes for ordinary strings.
+quote-style = "single"
+# Use four spaces for indentation.
+indent-style = "space"
+# Do not preserve wrapping only because an expression has a trailing comma.
+skip-magic-trailing-comma = true
+# Write LF endings on every operating system.
+line-ending = "lf"
+
+[tool.ruff.lint]
+# Selector order is alphabetical for readability and does not change precedence.
+select = ["B", "C4", "E", "F", "I", "Q", "W"]
+# Ruff uses Black-compatible slice spacing, which conflicts with pycodestyle E203.
+extend-ignore = ["E203"]
+
+[tool.ruff.lint.flake8-quotes]
+inline-quotes = "single"
+multiline-quotes = "double"
+docstring-quotes = "double"
+avoid-escape = true
+
+[tool.ruff.lint.isort]
+# Match the Google import order validated by ament_flake8.
+force-sort-within-sections = true
+section-order = [
+  "future",
+  "standard-library",
+  "third-party",
+  "first-party",
+  "local-folder",
+]
+# Sort names alphabetically instead of grouping them by capitalization.
+order-by-type = false
+# This repository has a launch directory, but launch is an external ROS 2 package.
+known-third-party = ["launch"]
+# Keep import formatting compatible with the formatter.
+split-on-trailing-comma = false
+
+[tool.pytest.ini_options]
+addopts = "-q"
+testpaths = ["test"]
