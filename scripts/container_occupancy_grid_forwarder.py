@@ -35,7 +35,8 @@ from cargo_planner_msgs.srv import ContainerOccupancyGridRegistration
 from nav_msgs.msg import OccupancyGrid
 import rclpy
 from rclpy.node import Node
-from rclpy.qos import DurabilityPolicy, QoSProfile
+from rclpy.qos import DurabilityPolicy
+from rclpy.qos import QoSProfile
 
 
 class ContainerOccupancyGridForwarder(Node):

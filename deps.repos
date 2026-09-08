@@ -1,15 +1,11 @@
-# This is a template for creating a repository file. Replace the placeholders with actual values.
-#
-# Recommendations:
-#
 repositories:
     cargo_planner_msgs:
         type: git
         url: https://github.com/jfrascon/cargo_planner_msgs.git
-        version: 8ae08ecd490ca3b75d490fb82d76df97b7b1243c
+        version: 1276bc639cfad17ae73f5f2e50dbc805c14aaac1
         #exclude: [] # list of repos files inside repository_path to exclude (optional)
     ros2_launch_helpers:
         type: git
         url: https://github.com/jfrascon/ros2_launch_helpers.git
-        version: d3e169e4205cb4053eab0671a7437ce91bb1a56e
+        version: 62b2b516888238bdf1c80d32f5a73c6c1459002d
         #exclude: [] # list of repos files inside repository_path to exclude (optional)

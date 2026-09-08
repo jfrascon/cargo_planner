@@ -7,7 +7,9 @@ from nav_msgs.msg import OccupancyGrid
 import numpy as np
 import pytest
 
-from cargo_planner.visualizer import load_cargo_units, occupancy_grid_to_free_mask, to_cells
+from cargo_planner.visualizer import load_cargo_units
+from cargo_planner.visualizer import occupancy_grid_to_free_mask
+from cargo_planner.visualizer import to_cells
 
 
 def test_load_cargo_units_validates_and_preserves_dimensions(tmp_path: Path) -> None:

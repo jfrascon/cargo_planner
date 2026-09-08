@@ -16,8 +16,10 @@
   <depend>rclcpp_action</depend>
   <depend>visualization_msgs</depend>
 
-  <!-- OpenCV is found via CMake find_package(OpenCV); the rosdep key for the
-       system package is libopencv-dev. -->
+  <!--
+  OpenCV is found via CMake find_package(OpenCV); the rosdep key for the system package is
+  libopencv-dev.
+  -->
   <depend>libopencv-dev</depend>
 
   <exec_depend>ament_index_python</exec_depend>
@@ -29,16 +31,25 @@
   <exec_depend>rclpy</exec_depend>
   <exec_depend>ros2_launch_helpers</exec_depend>
 
-  <test_depend>ament_cmake_cppcheck</test_depend>
+  <test_depend>ament_cmake_lint_cmake</test_depend>
+  <test_depend>ament_cmake_xmllint</test_depend>
+  <test_depend>ament_cmake_clang_format</test_depend>
   <test_depend>ament_cmake_cpplint</test_depend>
   <test_depend>ament_cmake_flake8</test_depend>
-  <test_depend>ament_cmake_gtest</test_depend>
-  <test_depend>ament_cmake_lint_cmake</test_depend>
   <test_depend>ament_cmake_pep257</test_depend>
+  <!--
+  <test_depend>ament_cmake_copyright</test_depend>
+  -->
+  <test_depend>ament_cmake_cppcheck</test_depend>
+  <!--
+  <test_depend>ament_cmake_clang_tidy</test_depend>
+  -->
+  <!--
+  <test_depend>ament_cmake_mypy</test_depend>
+  -->
+  <test_depend>ament_cmake_gtest</test_depend>
   <test_depend>ament_cmake_pytest</test_depend>
-  <test_depend>ament_cmake_xmllint</test_depend>
   <test_depend>ament_lint_auto</test_depend>
-  <test_depend>python3-pytest</test_depend>
 
   <export>
     <build_type>ament_cmake</build_type>

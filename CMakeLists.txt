@@ -115,42 +115,29 @@ install(
   DESTINATION include)
 
 ament_export_dependencies(cargo_planner_msgs geometry_msgs nav_msgs OpenCV
-                          rclcpp visualization_msgs)
+                          rclcpp rclcpp_action visualization_msgs)
 ament_export_targets(export_${PROJECT_NAME} HAS_LIBRARY_TARGET)
 
 # Tests
 
 if(BUILD_TESTING)
-  find_package(ament_cmake_cppcheck REQUIRED)
-  find_package(ament_cmake_cpplint REQUIRED)
-  find_package(ament_cmake_flake8 REQUIRED)
-  find_package(ament_cmake_gtest REQUIRED)
-  find_package(ament_cmake_pytest REQUIRED)
   find_package(ament_lint_auto REQUIRED)
 
-  ament_add_gtest(test_grid_map_utils test/test_grid_map_utils.cpp)
-  target_link_libraries(test_grid_map_utils ${PROJECT_NAME}_ros_support)
-  target_include_directories(test_grid_map_utils PRIVATE include)
-
-  ament_add_gtest(test_cargo_planner test/test_cargo_planner.cpp)
-  target_link_libraries(test_cargo_planner ${PROJECT_NAME}_core)
-  target_include_directories(test_cargo_planner PRIVATE include)
-
-  ament_add_pytest_test(test_launch_contract test/test_launch_contract.py)
-  ament_add_pytest_test(test_python_tools test/test_python_tools.py)
-
-  # Register configurable linters once with the package settings.
-  list(
-    APPEND
-    AMENT_LINT_AUTO_EXCLUDE
-    ament_cmake_cppcheck
+  # Exclude linters that require package-specific configuration.
+  list(APPEND AMENT_LINT_AUTO_EXCLUDE
+    ament_cmake_clang_format
     ament_cmake_cpplint
-    ament_cmake_flake8)
+    ament_cmake_flake8
+    ament_cmake_cppcheck)
 
-  ament_cppcheck(include src INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}/include")
-  # Allow Cppcheck 1.88 and 2.x through the ROS 2 Jazzy wrapper.
-  set_tests_properties(
-    cppcheck PROPERTIES ENVIRONMENT "AMENT_CPPCHECK_ALLOW_SLOW_VERSIONS=1")
+  # Register the remaining linters declared as test dependencies in package.xml.
+  ament_lint_auto_find_test_dependencies()
+
+  find_package(ament_cmake_clang_format REQUIRED)
+
+  ament_clang_format(CONFIG_FILE "${CMAKE_CURRENT_SOURCE_DIR}/.clang-format" include src test)
+
+  find_package(ament_cmake_cpplint REQUIRED)
 
   ament_cpplint(
     MAX_LINE_LENGTH
@@ -162,10 +149,32 @@ if(BUILD_TESTING)
     -runtime/indentation_namespace
     -legal/copyright)
 
+  find_package(ament_cmake_flake8 REQUIRED)
+
   ament_flake8(CONFIG_FILE "${CMAKE_CURRENT_SOURCE_DIR}/ament_flake8.ini")
 
-  # Register remaining linters declared as test dependencies.
-  ament_lint_auto_find_test_dependencies()
+  find_package(ament_cmake_cppcheck REQUIRED)
+
+  # Check only headers and source files.
+  # Some gtest macros such as TEST_F and TEST_P can produce cppcheck false positives in test
+  # sources.
+  ament_cppcheck(include src INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}/include")
+
+  # ament_cppcheck skips cppcheck versions known to be slow unless this environment variable
+  # explicitly allows them.
+  set_tests_properties(
+    cppcheck PROPERTIES ENVIRONMENT "AMENT_CPPCHECK_ALLOW_SLOW_VERSIONS=1")
+
+  ament_add_gtest(test_grid_map_utils test/test_grid_map_utils.cpp)
+  target_link_libraries(test_grid_map_utils ${PROJECT_NAME}_ros_support)
+  target_include_directories(test_grid_map_utils PRIVATE include)
+
+  ament_add_gtest(test_cargo_planner test/test_cargo_planner.cpp)
+  target_link_libraries(test_cargo_planner ${PROJECT_NAME}_core)
+  target_include_directories(test_cargo_planner PRIVATE include)
+
+  ament_add_pytest_test(test_launch_contract test/test_launch_contract.py)
+  ament_add_pytest_test(test_python_tools test/test_python_tools.py)
 endif()
 
 ament_package()

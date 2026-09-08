@@ -55,18 +55,26 @@ repos:
   # Python hooks
   # Ruff replaces both Black (formatter) and isort (import sorting).
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.16.5
+    rev: v0.16.6
     hooks:
       - id: ruff-check
         args: [--fix]
       - id: ruff-format
 
-  # Validate Python after Ruff applies its automatic changes.
+  # ROS 2 Python validation
+  # These hooks validate Python after Ruff applies its automatic changes.
   - repo: local
     hooks:
+      # - id: ament_mypy
+      #   name: ament_mypy
+      #   description: Statically check Python type annotations with mypy.
+      #   entry: ament_mypy
+      #   language: system
+      #   types: [python]
+
       - id: ament_flake8
         name: ament_flake8
-        description: Validate Python with the package ROS 2 Flake8 configuration.
+        description: Check Python code with the ROS 2 Flake8 configuration.
         entry: ament_flake8
         language: system
         types: [python]
@@ -74,7 +82,7 @@ repos:
 
       - id: ament_pep257
         name: ament_pep257
-        description: Validate Python docstrings with the ROS 2 PEP 257 wrapper.
+        description: Check Python docstrings with the ROS 2 PEP 257 configuration.
         entry: ament_pep257
         language: system
         types: [python]
@@ -115,29 +123,30 @@ repos:
   # to be installed in the development environment.
   - repo: local
     hooks:
+      - id: ament_cpplint
+        name: ament_cpplint
+        description: Check C/C++ style with ROS 2 cpplint.
+        entry: ament_cpplint
+        language: system
+        files: '\.(h\+\+|h|hh|hxx|hpp|cuh|c|cc|cpp|cu|c\+\+|cxx|tpp|txx)$'
+        args:
+          - --linelength=120
+          # Keep cpplint aligned with .clang-format:
+          # Disable whitespace/newline: .clang-format controls brace placement.
+          # Disable whitespace/forcolon: .clang-format omits the space before range-for ':'.
+          # Disable build/include_order: .clang-format preserves include order.
+          # Disable runtime/indentation_namespace: .clang-format controls namespace indentation.
+          # Disable legal/copyright: this project does not enforce copyright headers.
+          - --filters=-whitespace/newline,-whitespace/forcolon,-build/include_order,-runtime/indentation_namespace,-legal/copyright
+
       - id: ament_cppcheck
         name: ament_cppcheck
         description: Static code analysis of C/C++ files.
         entry: env AMENT_CPPCHECK_ALLOW_SLOW_VERSIONS=1 ament_cppcheck
         language: system
         files: '\.(h\+\+|h|hh|hxx|hpp|cuh|c|cc|cpp|cu|c\+\+|cxx|tpp|txx)$'
-        # Test code is compiled, checked by the other hooks, and run by GTest.
+        # Test sources are compiled, checked by the other C++ hooks, and run separately.
         exclude: ^test/
-
-      - id: ament_cpplint
-        name: ament_cpplint
-        description: Static code analysis of C/C++ files.
-        entry: ament_cpplint
-        language: system
-        files: '\.(h\+\+|h|hh|hxx|hpp|cuh|c|cc|cpp|cu|c\+\+|cxx|tpp|txx)$'
-        args:
-          - --linelength=120
-          # Disable whitespace/newline because it conflicts with the configured brace layout.
-          # Disable whitespace/forcolon because .clang-format omits the range-colon space.
-          # Disable build/include_order because .clang-format preserves the include order.
-          # Disable runtime/indentation_namespace because .clang-format controls that layout.
-          # Disable legal/copyright because the project has no copyright header policy.
-          - --filters=-whitespace/newline,-whitespace/forcolon,-build/include_order,-runtime/indentation_namespace,-legal/copyright
 
       - id: ament_lint_cmake
         name: ament_lint_cmake
@@ -148,7 +157,7 @@ repos:
 
       - id: ament_xmllint
         name: ament_xmllint
-        description: Validate XML files with the ROS 2 XML wrapper.
+        description: Check XML files with the ROS 2 XML linter.
         entry: ament_xmllint
         language: system
         types: [xml]

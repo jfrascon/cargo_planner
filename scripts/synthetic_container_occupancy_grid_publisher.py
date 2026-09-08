@@ -43,10 +43,12 @@ import math
 from pathlib import Path
 
 from geometry_msgs.msg import Pose
-from nav_msgs.msg import MapMetaData, OccupancyGrid
+from nav_msgs.msg import MapMetaData
+from nav_msgs.msg import OccupancyGrid
 import rclpy
 from rclpy.node import Node
-from rclpy.qos import DurabilityPolicy, QoSProfile
+from rclpy.qos import DurabilityPolicy
+from rclpy.qos import QoSProfile
 import yaml
 
 

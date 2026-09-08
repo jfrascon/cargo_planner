@@ -1,37 +1,89 @@
-# ==============================================================================
-# Ruff configuration (formatter + linter)
-# ==============================================================================
 [tool.ruff]
-line-length = 100
-# Treat modules below the repository root and its "src" directory as first-party.
+line-length = 99
+target-version = "py310"
+# Treat modules below the repository root and its 'src' directory as first-party.
 # These are Ruff's default source roots, declared explicitly for clarity.
 src = [".", "src"]
 
 [tool.ruff.format]
 # Use single quotes for ordinary strings.
 quote-style = "single"
-# Use four spaces for indentation.
+# Keep classic 4-space indentation.
 indent-style = "space"
-# Do not preserve wrapping only because an expression has a trailing comma.
+# Disable Black's 'magic trailing comma' auto-wrapping behaviour.
 skip-magic-trailing-comma = true
-# Write LF endings on every operating system.
+# Always write LF line endings, regardless of the OS that runs the formatter.
 line-ending = "lf"
 
 [tool.ruff.lint]
-# Selector order is alphabetical for readability and does not change precedence.
-select = ["B", "C4", "E", "F", "I", "Q", "W"]
-# Ruff uses Black-compatible slice spacing, which conflicts with pycodestyle E203.
-extend-ignore = ["E203"]
 
+# 'select' specifies an explicit list of rules to enable.
+# Ruff will only check for rules in this list, ignoring all others.
+# The selected rules are:
+# - A:  flake8-builtins rules.
+#       These rules detect when a variable name shadows a Python built-in name (e.g., using 'list'
+#       as a variable name).
+# - B:  flake8-bugbear rules.
+#       These rules detect likely bugs and error-prone practices that Flake8 does not check by
+#       default.
+# - C4: flake8-comprehensions rules.
+#       These rules replace unnecessary list, set, and dictionary comprehensions with clearer forms.
+# - D:  pydocstyle rules.
+#       These rules check for PEP 257 violations in docstrings, such as missing or malformed
+#       docstrings.
+# - E:  pycodestyle errors.
+#       These rules detect important PEP 8 violations, such as invalid indentation or spacing.
+# - F:  Pyflakes rules.
+#       These rules detect logical errors such as undefined variables and unused imports.
+# - I:  isort-compatible rules implemented by Ruff.
+#       These rules sort imports into predictable sections and order them consistently.
+# - Q:  flake8-quotes rules.
+#       These rules enforce the quote styles configured below.
+# - UP: pyupgrade rules.
+#       These rules modernize Python syntax when the change is safe for the configured
+#       target-version.
+# - W:  pycodestyle warnings.
+#       These rules detect less severe PEP 8 violations, such as trailing whitespace.
+
+select = ["A", "B", "C4", "D", "E", "F", "I", "Q", "UP", "W"]
+ignore = [
+  "D100",
+  "D101",
+  "D102",
+  "D103",
+  "D104",
+  "D105",
+  "D106",
+  "D107",
+  "D203",
+  "D212",
+  "D404",
+  "E203",
+]
+
+# This section allows fine-tuning of the 'Q' rules (flake8-quotes).
 [tool.ruff.lint.flake8-quotes]
+
+# Enforces the use of single quotes for all inline strings (strings that do not
+# span multiple lines).
 inline-quotes = "single"
-multiline-quotes = "double"
+# Enforces the use of double quotes for docstrings (e.g., """My Docstring""").
 docstring-quotes = "double"
+# Use triple double quotes for multiline strings so the formatter and linter agree.
+multiline-quotes = "double"
+# Keep the other quote style when it avoids inserting a backslash escape.
 avoid-escape = true
 
 [tool.ruff.lint.isort]
-# Match the Google import order validated by ament_flake8.
+# Split a 'from module import a, b, c' statement into multiple lines like:
+# from module import a
+# from module import b
+# from module import c
+force-single-line = true
+# Match Ruff's import ordering to the Google style enforced by ament_flake8.
+# Sort imports by module name without prioritizing import statements over from statements.
 force-sort-within-sections = true
+# Place external dependencies before first-party imports, as required by that Google style.
 section-order = [
   "future",
   "standard-library",
@@ -39,13 +91,21 @@ section-order = [
   "first-party",
   "local-folder",
 ]
-# Sort names alphabetically instead of grouping them by capitalization.
+# Sort imported names alphabetically instead of grouping names by capitalization.
 order-by-type = false
-# This repository has a launch directory, but launch is an external ROS 2 package.
-known-third-party = ["launch"]
-# Keep import formatting compatible with the formatter.
+known-first-party = ["cargo_planner"]
+known-third-party = [
+  "PIL",
+  "ament_index_python",
+  "cargo_planner_msgs",
+  "geometry_msgs",
+  "launch",
+  "launch_ros",
+  "nav_msgs",
+  "numpy",
+  "pytest",
+  "rclpy",
+  "ros2_launch_helpers",
+  "yaml",
+]
 split-on-trailing-comma = false
-
-[tool.pytest.ini_options]
-addopts = "-q"
-testpaths = ["test"]

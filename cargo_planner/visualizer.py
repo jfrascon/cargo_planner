@@ -23,17 +23,21 @@ the cargo_planner_msgs/CargoListRegistration service request:
 
 from __future__ import annotations
 
+from collections.abc import Iterable
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
-from math import ceil, isfinite
+from math import ceil
+from math import isfinite
 from numbers import Real
 from pathlib import Path
-from typing import Iterable, Sequence
 
 from nav_msgs.msg import OccupancyGrid
 import numpy as np
 from numpy.lib.stride_tricks import sliding_window_view
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image
+from PIL import ImageDraw
+from PIL import ImageFont
 import rclpy
 from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.node import Node
@@ -593,7 +597,9 @@ class CargoPlannerVisualDebugger:
         lines = ['filename\tdescription']
         for filename, description in image_manifest:
             lines.append(f'{filename}\t{description}')
-        (self._run_dir / 'image_manifest.txt').write_text('\n'.join(lines) + '\n', encoding='utf-8')
+        (self._run_dir / 'image_manifest.txt').write_text(
+            '\n'.join(lines) + '\n', encoding='utf-8'
+        )
 
 
 class CargoPlannerVisualizer(Node):
@@ -875,7 +881,9 @@ class CargoPlannerVisualizer(Node):
         lines = ['filename\tdescription']
         for filename, description in image_manifest:
             lines.append(f'{filename}\t{description}')
-        (self._run_dir / 'image_manifest.txt').write_text('\n'.join(lines) + '\n', encoding='utf-8')
+        (self._run_dir / 'image_manifest.txt').write_text(
+            '\n'.join(lines) + '\n', encoding='utf-8'
+        )
 
 
 def main(args: Sequence[str] | None = None) -> None:
